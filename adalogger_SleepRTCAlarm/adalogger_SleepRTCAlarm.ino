@@ -17,6 +17,8 @@
 
 #include <RTCZero.h>
 
+// #define CLOSE_SERIAL_TEST // uncomment to twiddle registers for tackling the standbyMode()/USB issue
+
 #define redLED 13
 #define grnLED 8
 boolean ledStatus = false;
@@ -46,18 +48,21 @@ void setup() {
 void loop() {}
 
 void alarmMatch() { // delay() doesn't work in ISRs...?
+  #ifndef CLOSE_SERIAL_TEST
+    //Serial.begin(9600); while(!Serial); Serial.println();
+    Serial.print('@');
+  #endif
   
-  Serial.print('@');
   ledStatus = !ledStatus;
-  //Serial.begin(9600); while(!Serial);
-  //Serial.println();
   digitalWrite(grnLED, ledStatus);
   digitalWrite(redLED, !ledStatus);
 
+  // generate SD card file
+  
   // enable recording
   
   // configure next alarm
-  if ((alarmNdx +1)*alSize < bytesStored) alarmConfig(); 
+  if ((alarmNdx +1)*alSize <= bytesStored) alarmConfig(); 
   
 }
 
@@ -69,7 +74,7 @@ void timeConfig() { // set RTC time based on the received data
   rtc.setTime(rxBuffer[i + 0], rxBuffer[i + 1], rxBuffer[i + 2]); // hh, mm, ss
   rtc.setDate(rxBuffer[i + 3], rxBuffer[i + 4], rxBuffer[i + 5]); // DD, MM, YY
 
-  rtc.enableAlarm(rtc.MATCH_YYMMDDHHMMSS); // not needed every time?
+  rtc.enableAlarm(rtc.MATCH_YYMMDDHHMMSS); // other modes are available, see RTCZero.h
   rtc.attachInterrupt(alarmMatch);
   
 }
@@ -91,7 +96,9 @@ void alarmConfig() { // set alarms on startup or with each alarm trigger
     Serial.write(rtc.getAlarmYear());
   */
 
-  //rtc.standbyMode(); <--- wooo badddd. Need to test this w/o USB.
+  #ifdef CLOSE_SERIAL_TEST
+    rtc.standbyMode(); // <--- wooo badddd. Need to test this w/o USB.
+  #endif
   
 }
 
@@ -129,6 +136,13 @@ void serialEventOnSetup() {
     Serial.write(rxBuffer[bytesTxd]);
     bytesTxd++;
   }
+
+  // failing attempts at resolving the standbyMode problem...
+  #ifdef CLOSE_SERIAL_TEST
+    Serial.end();
+    USB->DEVICE.CTRLA.bit.RUNSTDBY = 0; 
+      // https://github.com/arduino/ArduinoCore-samd/blob/master/cores/arduino/USB/samd21_host.c
+  #endif
 
   timeConfig(); // apparently need rtc.begin() first else alarm write syncs won't work...
   alarmConfig();
