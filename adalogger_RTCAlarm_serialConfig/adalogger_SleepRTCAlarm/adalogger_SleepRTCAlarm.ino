@@ -8,7 +8,7 @@
     Issues:
       Time appears to be sync'd within seconds (can be improved)
       Error checking can be introduced to make receiving information reliable
-      Problems with putting the processor to sleep - only one alarm works when Serial used!
+      Problems with putting the processor to sleep - seem to hang up on waking up...
 
   Adapted from:
   http://arduino.cc/en/Tutorial/SleepRTCAlarm by Arturo Guadalupi
@@ -17,7 +17,7 @@
 
 #include <RTCZero.h>
 
-// #define CLOSE_SERIAL_TEST // uncomment to twiddle registers for tackling the standbyMode()/USB issue
+//#define USING_SERIAL // comment if testing w/o native USB
 
 #define redLED 13
 #define grnLED 8
@@ -45,25 +45,16 @@ void setup() {
   
 }
 
-void loop() {}
+void loop() {
 
-void alarmMatch() { // delay() doesn't work in ISRs...?
-  #ifndef CLOSE_SERIAL_TEST
+  digitalWrite(redLED, 1); delay(100); // to check if the processor hangs up post alarm!
+  digitalWrite(redLED, 0); delay(100); 
+ 
+  //Serial.begin(9600);
+  //  while(!Serial);
     //Serial.begin(9600); while(!Serial); Serial.println();
-    Serial.print('@');
-  #endif
-  
-  ledStatus = !ledStatus;
-  digitalWrite(grnLED, ledStatus);
-  digitalWrite(redLED, !ledStatus);
-
-  // generate SD card file
-  
-  // enable recording
-  
-  // configure next alarm
-  if ((alarmNdx +1)*alSize <= bytesStored) alarmConfig(); 
-  
+  //Serial.print('@');
+     rtc.standbyMode();
 }
 
 void timeConfig() { // set RTC time based on the received data
@@ -96,9 +87,64 @@ void alarmConfig() { // set alarms on startup or with each alarm trigger
     Serial.write(rtc.getAlarmYear());
   */
 
-  #ifdef CLOSE_SERIAL_TEST
-    rtc.standbyMode(); // <--- wooo badddd. Need to test this w/o USB.
+  //#ifdef USING_SERIAL
+  //  Serial.end();
+  //  USBDevice.detach(); // https://forums.adafruit.com/viewtopic.php?f=22&t=86144
+  //  delay(500);
+  //#endif
+
+  //USBDevice.detach(); // https://forums.adafruit.com/viewtopic.php?f=22&t=86144
+  //  delay(500);
+  NVMCTRL->CTRLB.bit.SLEEPPRM = 3; //NVMCTRL_CTRLB_SLEEPPRM_DISABLED_Val; // http://community.atmel.com/forum/samd20-problem-waking-systemsleep
+  //SCB->SCR &= ~SCB_SCR_SLEEPDEEP_Msk;
+  //PM->SLEEP.reg = 2;
+  //__WFI();
+  
+  rtc.standbyMode();
+  
+}
+
+void alarmConfig2() { // set alarms on startup or with each alarm trigger
+  
+  int i = alarmNdx * alSize; //Serial.println(i);
+  rtc.setAlarmTime(rxBuffer[i + 0], rxBuffer[i + 1], rxBuffer[i + 2]); // hh, mm, ss
+  rtc.setAlarmDate(rxBuffer[i + 3], rxBuffer[i + 4], rxBuffer[i + 5]); // DD, MM, YY
+  
+  alarmNdx++;
+
+  //NVMCTRL->CTRLB.bit.SLEEPPRM = 3; //NVMCTRL_CTRLB_SLEEPPRM_DISABLED_Val; // http://community.atmel.com/forum/samd20-problem-waking-systemsleep 
+  //rtc.standbyMode();
+  
+}
+
+
+void alarmMatch() { // delay() doesn't work in ISRs...?
+
+  //USBDevice.attach();
+
+  #ifdef USING_SERIAL
+    //digitalWrite(grnLED, 1);
+    //USBDevice.attach();
+    //Serial.begin(9600);
+    while(!Serial);
+    //Serial.begin(9600); while(!Serial); Serial.println();
+    Serial.print('@');
+    //digitalWrite(grnLED, 0);
   #endif
+  
+  ledStatus = !ledStatus;
+  digitalWrite(grnLED, ledStatus);
+  digitalWrite(redLED, !ledStatus);
+  //digitalWrite(grnLED, 1); //delay(100);
+  //digitalWrite(grnLED, 0);
+
+  // generate SD card file
+  
+  // enable recording
+  
+  // configure next alarm  // <--- wooo badddd. Need to test this w/o USB.
+  // if ((alarmNdx +1)*alSize <= bytesStored) alarmConfig(); // THIS hangs up the processor post wake-up!
+  alarmConfig2();
   
 }
 
@@ -138,17 +184,20 @@ void serialEventOnSetup() {
   }
 
   // failing attempts at resolving the standbyMode problem...
-  #ifdef CLOSE_SERIAL_TEST
-    Serial.end();
-    USB->DEVICE.CTRLA.bit.RUNSTDBY = 0; 
+  //#ifndef USING_SERIAL
+    //USBDevice.detach(); // https://forums.adafruit.com/viewtopic.php?f=22&t=86144
+    //delay(500);
+    //Serial.end();
+    //USB->DEVICE.CTRLA.bit.RUNSTDBY = 0; 
       // https://github.com/arduino/ArduinoCore-samd/blob/master/cores/arduino/USB/samd21_host.c
-  #endif
+  //#endif
 
   timeConfig(); // apparently need rtc.begin() first else alarm write syncs won't work...
   alarmConfig();
   
 }
 
+/*
 void heartBeat(){
   
   int waitCounter = millis(), waitFor = 450, toFlip = 200;
@@ -162,4 +211,4 @@ void heartBeat(){
   }
   
 }
-
+*/
