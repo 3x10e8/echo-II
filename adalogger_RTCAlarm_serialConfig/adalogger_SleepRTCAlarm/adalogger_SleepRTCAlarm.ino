@@ -17,7 +17,7 @@
 
 #include <RTCZero.h>
 
-#define USING_SERIAL
+// #define USING_SERIAL
 // uncomment if indicating alarms through Serial writes
 // skips putting the processor to sleep
 
@@ -49,13 +49,14 @@ void setup() {
   // could set to 3: http://community.atmel.com/forum/samd20-problem-waking-systemsleep
 
   // Could Serial.end() and/or USBDevice.disable() but standBy forces that...
+  // Serial.end();
+  // USBDevice.detach();
 }
 
 void loop() {   // Processor is awake!
 
-  // USBDevice.attach(); Serial.write('@');
-  // Serial.begin(9600); while(!Serial); Serial.write('@'); Serial.end();
-  // nope doesn't come up...
+  //Serial.write('@');
+    // nope doesn't come up...
 
   #ifndef USING_SERIAL
   
@@ -64,8 +65,14 @@ void loop() {   // Processor is awake!
     digitalWrite(grnLED, 1); delay(100);
     digitalWrite(grnLED, 0); delay(100);
   
+    // Serial.end();
     rtc.standbyMode();
   #endif
+
+  //USBDevice.init();
+  //USBDevice.attach();
+  //Serial.begin(9600); while(!Serial);
+  
 }
 
 void timeConfig() { // set RTC time based on the received data
